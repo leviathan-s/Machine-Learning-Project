@@ -1,0 +1,90 @@
+# 타이타닉 생존자 예측 프로젝트
+# ML Algorithm : Logistic Regressor
+# 0.9 Accuracy
+# Description : Kaggle의 가장 유명한 예제인 타이타닉 생존자 예측 프로젝트를 진행하였다.
+
+# 필요한 모듈 불러오기
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+# Data를 DataFrame으로 불러오기
+titanic_df = pd.read_csv("./train.csv")
+titanic_df.head()
+
+# 모든 전처리과정을 함수화 하기
+from sklearn.preprocessing import LabelEncoder
+
+# null값을 처리하는 루틴
+def fillna(df):
+  df['Age'].fillna(df['Age'].mean(), inplace=True)
+  df['Cabin'].fillna('N', inplace=True)
+  df['Embarked'].fillna('N', inplace=True)
+  return df
+
+# 중요도가 떨어지는 column을 제거하는 루틴
+def drop_features(df):
+  df.drop(['PassengerId','Name','Ticket'], axis=1, inplace=True)
+  return df
+
+# 문자열로 되어 있는 컬럼을 숫자 레이블로 인코딩하는 루틴
+def format_features(df):
+  columns = ['Cabin','Sex','Embarked']
+  for column in columns:
+    encoder = LabelEncoder()
+    encoder.fit(df[column])
+    df[column] = encoder.transform(df[column])
+
+  return df
+
+# 위 모든 루틴을 처리하여 일괄적으로 Preprocessed DataFrame을 반환한다
+def transform_features(df):
+  df = fillna(df)
+  df = drop_features(df)
+  df = format_features(df)
+  return df
+  
+# DataFrame을 분리시킨다
+# Feature DataFrame과 Lable(Target) DataFrame으로 분리
+y_titanic_df = titanic_df['Survived']
+X_titanic_df = titanic_df.drop(['Survived'], axis=1 ,inplace=False)
+X_titanic_df = transform_features(X_titanic_df)
+
+
+# Logistic Regressor 생성
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+
+lr_clf = LogisticRegression(solver='liblinear')
+
+# Estimator와 fold 수를 지정해주면 자동으로 회차별 교차검증 정확도와 평균 교차검증 정확도를 출력해주는 함수
+from sklearn.model_selection import KFold
+import numpy as np
+
+def exec_kfold(clf, folds=5):
+  kfold = KFold(n_splits = folds)
+  scores = []
+  cv_accuracy = []
+  for iter_count, (train_idx, test_idx) in enumerate(kfold.split(X_titanic_df)):
+    tr_data, tst_data = X_titanic_df.iloc[train_idx], X_titanic_df.iloc[test_idx]
+    tr_target, tst_target = y_titanic_df.iloc[train_idx], y_titanic_df.iloc[test_idx]
+    clf.fit(tr_data, tr_target)
+    pred = clf.predict(tst_data)
+    accuracy = accuracy_score(tst_target, pred)
+    print("{}회 교차검증 결과 정확도 : {}".format(iter_count, accuracy))
+    cv_accuracy.append(accuracy)
+  print("평균 교차검증 정확도 : {}".format(np.mean(cv_accuracy)))
+
+exec_kfold(lr_clf)
+
+# 교차검증 실시하는 더 쉬운 루틴
+from sklearn.model_selection import cross_val_score
+scores = cross_val_score(lr_clf, X_titanic_df, y_titanic_df, cv=5)
+
+# 정확도 최종 출력
+lr_clf.fit(X_train, y_train)
+pred = lr_clf.predict(X_test)
+accuracy = accuracy_score(y_test, pred)
+accuracy
